@@ -1,0 +1,100 @@
+%{
+#include <iostream>
+#include <string>
+#include <map>
+#include <cstdlib>
+#include <cassert>
+#include <set>
+#include <fstream>
+
+using namespace std;
+
+int yylex();
+
+int yyerror(const char *p) {
+    cerr << "Error! Unexpected token " << p << endl;
+    return 1;
+}
+
+map<string, char> ver;
+map<pair<string, char>, string> tr;
+set<char> symbols;
+set<char> alpha;
+int cnt = 0;
+string start;
+%}
+
+%union {
+  char* str;
+  char sym;
+};
+
+%token <str> VERTEX
+%token <sym> CONDITION EDGE LP RP COMMA SYMBOL
+
+%%
+start: alphapet states transitions {}
+
+alphapet: alphapet SYMBOL                                { alpha.insert($2); }
+| SYMBOL                                                 { alpha.insert($1); }
+
+states: states VERTEX CONDITION                          { 
+    if ($3 == 's') {
+        start = $2;
+    }
+    ver[$2] = $3; }
+| VERTEX CONDITION                                       { 
+    if ($2 == 's') {
+        start = $1;
+    }
+    ver[$1] = $2; }
+
+transitions: transitions trans                          {}
+| trans                                                 {}
+
+sequence: sequence COMMA SYMBOL             { symbols.insert($3); }
+| SYMBOL                                    { symbols.insert($1); }
+
+trans: EDGE VERTEX VERTEX LP sequence RP                  { 
+    for (auto x : symbols) {
+        auto p = make_pair($2, x);
+        tr[p] = $3;
+    }
+    symbols.clear();
+ } 
+
+%%
+
+bool match(const string& expr) {
+    string state = start;
+    int idx = 0;
+    while (idx != expr.size()){
+        if (alpha.find(expr[idx]) == alpha.end()) {
+            return false;
+        }
+        state = tr[make_pair(state, expr[idx])];
+        idx++;
+    }
+    if (ver[state] == 't') {
+        return true;
+    }
+    return false;
+}
+
+
+int main(int argc, char* argv[])
+{
+  freopen(argv[1], "r", stdin);
+  yyparse();
+  fclose(stdin);
+
+  std::ifstream input(argv[2]);
+    std::string matched_string;
+    input >> matched_string;
+    if (match(matched_string)){
+        std::cout << "YES\n";
+    } else {
+        std::cout << "NO\n";
+    }
+    return 0;
+}
